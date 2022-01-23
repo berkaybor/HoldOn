@@ -9,12 +9,11 @@ import subprocess
 from zipfile import ZipFile
 import platform
 import os
+import configparser
 
 ip_address = ""
-my_name = ""
 port = 12345
-ip_dictionary = {}
-discover_response_dictionary = {}
+
 encoding = "utf-8"
 flyingPackages = {}
 receiveWindow = 1
@@ -22,6 +21,9 @@ packageSize = 1500
 ackPackages = []
 
 system_type = ""
+server_ip = ""
+user_ip = ""
+wifi_ssid = ""
 
 def get_ip():
     global ip_address
@@ -32,7 +34,7 @@ def get_ip():
     finally:
         s.close()
 
-
+"""
 def create_message(message_type, body=""):
     global ip_address
     message = {}
@@ -49,6 +51,30 @@ def create_message(message_type, body=""):
     elif message_type == 7:
         message = {'type': message_type, 'input': body}
     return json.dumps(message)
+"""
+
+def create_msg(msg_type, ip=None, backup_store_time=None, command=None):
+    if msg_type == 1:
+        # Discover message
+        curr_dt = datetime.now()
+        timestamp = int(round(curr_dt.timestamp()))
+        return {'type': msg_type, 'IP': ip, 'ID': timestamp}
+    elif msg_type == 2:
+        # Discover response
+        return {'type': msg_type, 'IP': ip}
+    elif msg_type == 3:
+        # Initialize app
+        return {'type': msg_type, 'backup_store_time': backup_store_time}
+    elif msg_type == 4:
+        pass
+    elif msg_type == 5:
+        pass
+    elif msg_type == 6:
+        return {'type': msg_type, 'command': command}
+    elif msg_type == 7:
+        return {'type': msg_type, 'input': command}
+    else:
+        raise Exception('Wrong type of msg')
 
 
 def discover_online_devices():
@@ -56,25 +82,24 @@ def discover_online_devices():
         sock.bind(("", 0))
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         for i in range(10):
-            sock.sendto(create_message(1).encode(encoding=encoding), ('<broadcast>', port))
+            sock.sendto(create_msg(1, ip=ip_address).encode(encoding=encoding), ('<broadcast>', port))
 
 
-def show_online_devices():
-    global ip_dictionary
-    if len(ip_dictionary) == 0:
-        print("There is no active user")
-    else:
-        print("Active Users:")
-        for key in ip_dictionary.keys():
-            print(key)
+def send_msg(host, msg):
+    byte_msg = json.dumps(msg).encode('utf-8')
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((host, port))
+        s.sendall(byte_msg)
 
 
 def listen_discover_message():
+    global user_ip
+
     receivedFile = {}
     lastPackage = False
     lastPackageSEQ = 0
-    global ip_dictionary
-    global discover_response_dictionary
+    
+    IDs = []
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.bind(("", port))
         s.setblocking(False)
@@ -84,23 +109,19 @@ def listen_discover_message():
             message = json.loads(json_msg.decode(encoding=encoding))
             if message["type"] == 1:
                 if message["IP"] != ip_address:
-                    if not message["name"] in discover_response_dictionary.keys():
-                        ip_dictionary[message["name"]] = message["IP"]
-                        discover_response_dictionary[message["name"]] = message["ID"]
-                        respond_message = create_message(2)
-                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
-                            new_socket.connect((message["IP"], port))
-                            new_socket.sendall(respond_message.encode(encoding=encoding))
-                    elif message["name"] in discover_response_dictionary.keys() and discover_response_dictionary[
-                        message["name"]] != message["ID"]:
-                        print(message["name"], "has changed id. Old ID: ",
-                              discover_response_dictionary[message["name"]], 'new ID:', message["ID"])
-                        ip_dictionary[message["name"]] = message["IP"]
-                        discover_response_dictionary[message["name"]] = message["ID"]
-                        respond_message = create_message(2)
-                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
-                            new_socket.connect((message["IP"], port))
-                            new_socket.sendall(respond_message.encode(encoding=encoding))
+                    print(message)
+
+                    if message['ID'] in IDs:
+                        continue
+                    IDs.append(message['ID'])
+
+                    user_ip = message['IP']
+                    print(user_ip)
+                    discover_response = create_msg(2, ip_address)
+                    send_msg(user_ip, discover_response)
+                    
+                    print(f'Connected to user with ip: {user_ip}')
+
             elif message["type"] == 4:
                 fileName = message["name"]
                 fileName = fileName.encode(encoding)
@@ -152,10 +173,8 @@ def getFileArray(filename):
 
 
 def listen_message():
-    global ip_dictionary
-    global flyingPackages
-    global receiveWindow
-    global ackPackages
+    global flyingPackages, receiveWindow, ackPackages, server_ip
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", port))
         s.listen()
@@ -168,17 +187,19 @@ def listen_message():
                     break
                 response = json.loads(output.decode(encoding=encoding))
                 if response["type"] == 1:
-                    if response["IP"] != ip_address:
-                        ip_dictionary[response["name"]] = response["IP"]
-                    respond_message = create_message(2)
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
-                        new_socket.connect((response["IP"], port))
-                        new_socket.sendall(respond_message.encode(encoding=encoding))
+                    print('MESSAGE TYPE 1 NOT USED IN TCP')
+                    continue
                 elif response["type"] == 2:
-                    if response["IP"] != ip_address:
-                        ip_dictionary[response["name"]] = response["IP"]
+                    server_ip = output['IP']
+                    print(f'Connected to server with ip: {server_ip}')
                 elif response["type"] == 3:
-                    print(response["name"] + ":   " + response["body"])
+                    print('Initializing server...')
+                    config = configparser.ConfigParser()
+                    if os.path.exists('server_config.ini'):
+                        config.read('server_config.ini')
+                    config['SERVER'] = {'backup_store_time': output['backup_store_time']}
+                    with open('server_config.ini', 'w') as f:
+                        config.write(f)
                 elif response["type"] == 5:
                     currentReceiveWindow = response['rwnd']
                     ackSEQ = response['seq']
@@ -197,44 +218,6 @@ def send_directory_info():
     filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
     msg = create_message(7,body=filenames)
     send_msg(user_ip,msg)
-
-
-def application_user_interface():
-    global ip_dictionary
-    while True:
-
-        user_input = input()
-        if user_input == "list":
-            show_online_devices()
-        elif user_input.split()[0] == "send":
-            receiver = user_input.split()[1]
-            if receiver in ip_dictionary.keys():
-                receiver_ip = ip_dictionary.get(receiver)
-                chat_message = " ".join(user_input.split()[2:])
-                json_message = create_message(3, body=chat_message)
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(1)
-                    try:
-                        s.connect((receiver_ip, port))
-                        s.sendall(json_message.encode(encoding=encoding))
-                    except socket.error:
-                        print("message cannot be sent! " + receiver + " is offline!")
-                        ip_dictionary.pop(receiver)
-            else:
-                print("No Such Active User!")
-        elif user_input.split()[0] == "sendFile":
-            receiver = user_input.split()[1]
-            if receiver in ip_dictionary.keys():
-                receiver_ip = ip_dictionary.get(receiver)
-                filename = user_input.split()[2]
-                sendFile_thread = Thread(target=fileSender, daemon=True, args=(filename, receiver_ip,))
-                sendFile_thread.start()
-            else:
-                print("No Such Active User!")
-        else:
-            print("No Valid Command")
-
-        sleep(0.3)
 
 
 def fileSender(fileName, receiver):
@@ -282,6 +265,44 @@ def sendPackage(package, SEQ, fileName, receiver):
     opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     opened_socket.sendto(jsonMessage.encode(encoding=encoding), (receiver, port))
 
+def get_all_file_paths(directory):
+  
+    # initializing empty file paths list
+    file_paths = []
+  
+    # crawling through directory and subdirectories
+    for root, directories, files in os.walk(directory):
+        for filename in files:
+            # join the two strings in order to form the full filepath.
+            filepath = os.path.join(root, filename)
+            file_paths.append(filepath)
+  
+    # returning all file paths
+    return file_paths
+
+
+def backup_files(backup_dir):
+    zip_name = datetime.now().strftime("%Y-%m-%d_%H:%M:%S") + '.zip'
+    file_paths = get_all_file_paths(backup_dir)
+    
+    # printing the list of all files to be zipped
+    print('Following files will be zipped:')
+    for file_name in file_paths:
+        print(file_name)
+
+    # writing files to a zipfile
+    with ZipFile(zip_name, 'w') as zip:
+        # writing each file one by one
+        for file in file_paths:
+            zip.write(file)
+
+    print('All files zipped successfully!')        
+    
+    sendFile_thread = Thread(target=fileSender, daemon=True, args=(zip_name, server_ip,))
+    sendFile_thread.start()
+    sendFile_thread.join()
+
+    os.remove(zip_name)
 
 def get_ssid(system_type):
     if system_type == 'Darwin':
@@ -301,59 +322,53 @@ def run_user():
     discover_listen_thread = Thread(target=listen_discover_message, daemon=True)
     listen_thread.start()
     discover_listen_thread.start()
+    discover_online_devices()
 
+    config = configparser.ConfigParser()
+    if os.path.exists('user_config.ini'):
+        config.read('user_config.ini')
+    else:
+        # First time configure
+        print('Initializing first time setup')
+        sleep(1)
+        if input(f'Do you want to connect server with ip {server_ip} on wifi with ssid {wifi_ssid}? (y/n): ') == 'y':
+            max_time_days = int(input('What is the maximum amount of days should backups be stored on backup server? '))
+            config['USER'] = {'backup_store_time': max_time_days, 'server_ip': server_ip}
+            with open('user_config.ini', 'w') as f:
+                config.write(f)
+            init_msg = create_msg(3, backup_store_time=max_time_days)
+            send_msg(server_ip, init_msg)
+        else:
+            return
+        
     while True:
 
         user_input = input()
-        if user_input == "list":
-            show_online_devices()
-        elif user_input.split()[0] == "send":
-            receiver = user_input.split()[1]
-            if receiver in ip_dictionary.keys():
-                receiver_ip = ip_dictionary.get(receiver)
-                chat_message = " ".join(user_input.split()[2:])
-                json_message = create_message(3, body=chat_message)
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(1)
-                    try:
-                        s.connect((receiver_ip, port))
-                        s.sendall(json_message.encode(encoding=encoding))
-                    except socket.error:
-                        print("message cannot be sent! " + receiver + " is offline!")
-                        ip_dictionary.pop(receiver)
-            else:
-                print("No Such Active User!")
-        elif user_input.split()[0] == "sendFile":
-            receiver = user_input.split()[1]
-            if receiver in ip_dictionary.keys():
-                receiver_ip = ip_dictionary.get(receiver)
-                filename = user_input.split()[2]
-                sendFile_thread = Thread(target=fileSender, daemon=True, args=(filename, receiver_ip,))
-                sendFile_thread.start()
-            else:
-                print("No Such Active User!")
+        if user_input == "backup":
+            backup_files('./backup/')
+        elif user_input == 'show':
+            msg= create_msg(6, command = "show")
+            send_msg(server_ip, msg)
         else:
             print("No Valid Command")
 
         sleep(0.3)
 
-    discover_online_devices()
+    
     listen_thread.join()
     discover_listen_thread.join()
 
 def run_server():
-    application_ui_thread = Thread(target=application_user_interface)
     listen_thread = Thread(target=listen_message, daemon=True)
     discover_listen_thread = Thread(target=listen_discover_message, daemon=True)
     listen_thread.start()
     discover_listen_thread.start()
-    application_ui_thread.start()
+    print('Waiting for user connection')
     listen_thread.join()
     discover_listen_thread.join()
-    application_ui_thread.join()
 
 def main():
-    global system_type
+    global system_type, wifi_ssid
 
     get_ip()
     print('Local ip:', ip_address)
