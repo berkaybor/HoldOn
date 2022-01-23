@@ -224,8 +224,11 @@ def listen_message():
 
 
 def send_directory_info():
-    filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
-    msg = create_msg(7,command=filenames)
+    output = ""
+    for root, dirs, files in os.walk("./serverBackups"):
+        for f in files:
+            output += (f + "\t" + str(os.stat("./serverBackups/" + f).st_size) + " bytes\n")
+    msg = create_msg(7,command=output)
     send_msg(user_ip,msg)
 
 
