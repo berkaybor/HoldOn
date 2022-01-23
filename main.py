@@ -81,8 +81,10 @@ def discover_online_devices():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(("", 0))
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        msg = create_msg(1, ip=ip_address)
+        print(msg)
         for i in range(10):
-            sock.sendto(create_msg(1, ip=ip_address).encode(encoding=encoding), ('<broadcast>', port))
+            sock.sendto(msg.encode(encoding=encoding), ('<broadcast>', port))
 
 
 def send_msg(host, msg):
@@ -150,8 +152,10 @@ def decodeFile(receivedFile, fileName):
     endString = ''
     for elm in range(len(receivedFile)):
         endString += str(receivedFile[elm])
+    save_path = './serverBackups'
 
-    with open(fileName, "wb") as imageFile:
+    completeName = os.path.join(save_path, fileName)
+    with open(completeName, "wb") as imageFile:
         endString = endString.encode(encoding)
         decodedString = base64.decodebytes(endString)
         imageFile.write(decodedString)
@@ -190,14 +194,14 @@ def listen_message():
                     print('MESSAGE TYPE 1 NOT USED IN TCP')
                     continue
                 elif response["type"] == 2:
-                    server_ip = output['IP']
+                    server_ip = response['IP']
                     print(f'Connected to server with ip: {server_ip}')
                 elif response["type"] == 3:
                     print('Initializing server...')
                     config = configparser.ConfigParser()
                     if os.path.exists('server_config.ini'):
                         config.read('server_config.ini')
-                    config['SERVER'] = {'backup_store_time': output['backup_store_time']}
+                    config['SERVER'] = {'backup_store_time': response['backup_store_time']}
                     with open('server_config.ini', 'w') as f:
                         config.write(f)
                 elif response["type"] == 5:
@@ -221,7 +225,7 @@ def listen_message():
 
 def send_directory_info():
     filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
-    msg = create_msg(7,body=filenames)
+    msg = create_msg(7,command=filenames)
     send_msg(user_ip,msg)
 
 
