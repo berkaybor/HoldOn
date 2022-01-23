@@ -45,7 +45,10 @@ def decodeFile(receivedFile, fileName):
     for elm in range(len(receivedFile)):
         endString += str(receivedFile[elm])
 
-    with open(fileName, "wb") as imageFile:
+    save_path = './serverBackups'
+
+    completeName = os.path.join(save_path, fileName)
+    with open(completeName, "wb") as imageFile:
         endString = endString.encode(encoding)
         decodedString = base64.decodebytes(endString)
         imageFile.write(decodedString)

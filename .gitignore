@@ -1,2 +1,5 @@
 .DS_Store
 __pycache__/**
+serverBackups/**
+server_config.ini
+user_config.ini
