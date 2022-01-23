@@ -82,7 +82,7 @@ def discover_online_devices():
         sock.bind(("", 0))
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         msg = create_msg(1, ip=ip_address)
-        print(msg)
+        #print(msg)
         for i in range(10):
             sock.sendto(msg.encode(encoding=encoding), ('<broadcast>', port))
 
@@ -117,7 +117,6 @@ def listen_discover_message():
                     IDs.append(message['ID'])
 
                     user_ip = message['IP']
-                    print(user_ip)
                     discover_response = create_msg(2, ip_address)
                     send_msg(user_ip, discover_response)
                     
@@ -139,9 +138,10 @@ def listen_discover_message():
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
                     new_socket.connect((message["IP"], port))
                     new_socket.sendall(respond_message.encode(encoding=encoding))
+                    print('.', end='', flush=True)
                 if lastPackage and (lastPackageSEQ + 1 == len(receivedFile)):
                     decodeFile(receivedFile, fileName)
-                    print(f'{fileName} packageNo {packageSEQ} is received')
+                    print(f'\n{fileName} is finished downloading')
                     receivedFile.clear()
                     lastPackage = False
                     lastPackageSEQ = 0
@@ -155,6 +155,8 @@ def decodeFile(receivedFile, fileName):
         endString += str(receivedFile[elm])
     if server_ip == "":
         save_path = './serverBackups'
+        if not os.path.exists('./serverBackups'):
+            os.makedirs('serverBackups')
     else:
         save_path = './downloads'
         if not os.path.exists('./downloads'):
@@ -198,7 +200,7 @@ def listen_message():
                     print("There is a problem about your socket you should restart your cmd or computer")
                     break
                 response = json.loads(output.decode(encoding=encoding))
-                print(response)
+                #print(response)
                 if response["type"] == 1:
                     print('MESSAGE TYPE 1 NOT USED IN TCP')
                     continue
@@ -214,7 +216,7 @@ def listen_message():
                     with open('server_config.ini', 'w') as f:
                         config.write(f)
                 elif response["type"] == 5:
-                    print(response)
+                    print('.', end='', flush=True)
                     currentReceiveWindow = response['rwnd']
                     ackSEQ = response['seq']
                     receiveWindow = currentReceiveWindow
@@ -223,12 +225,12 @@ def listen_message():
                     if response['command'] == "show":
                         send_directory_info()
                     else:
-                        print(f"Sending {response['command']}")
-                        print(user_ip)
+                        #print(f"Sending {response['command']}")
+                        #print(user_ip)
                         sendFile_thread = Thread(target=sendFile, daemon=True, args=(response['command'], user_ip,))
                         sendFile_thread.start()
                 elif response['type'] == 7:
-                    print("type 7 works")
+                    #print("type 7 works")
                     print(response['input'])
 
 
@@ -262,7 +264,7 @@ def fileSender(fileName, receiver):
         curr_time = int(round(dti.timestamp()))
         for elm in flyingPackages:
             if curr_time - flyingPackages[elm] >= 2:
-                print(f"{elm} : {curr_time - flyingPackages[elm]}")
+                #print(f"{elm} : {curr_time - flyingPackages[elm]}")
                 currentPackage = fileArray[elm]
                 sendPackage(currentPackage, elm, fileName, receiver)
                 flyingPackages[elm] = curr_time
@@ -279,7 +281,8 @@ def fileSender(fileName, receiver):
                 flyingPackages.clear()
                 receiveWindow = 1
                 ackPackages.clear()
-                print('file is sent successfully')
+                sleep(0.5)
+                print('\nFile is sent successfully')
                 return
 
 
@@ -313,7 +316,7 @@ def backup_files(backup_dir):
     file_paths = get_all_file_paths(backup_dir)
     
     # printing the list of all files to be zipped
-    print('Following files will be zipped:')
+    print('Following files will be backed up:')
     for file_name in file_paths:
         print(file_name)
 
@@ -323,7 +326,7 @@ def backup_files(backup_dir):
         for file in file_paths:
             zip.write(file)
 
-    print('All files zipped successfully!')        
+    print('Starting backup')
     
     sendFile_thread = Thread(target=fileSender, daemon=True, args=(zip_name, server_ip,))
     sendFile_thread.start()
@@ -332,23 +335,32 @@ def backup_files(backup_dir):
     os.remove(zip_name)
 
 def check_ssid(saved_ssid, path_to_backup_folder):
-    global wifi_ssid, server_ip
+    global wifi_ssid, server_ip, system_type
 
     while True:
-        current_ssid = get_ssid()
+        sleep(5)
+        current_ssid = get_ssid(system_type)
+        #print(saved_ssid, current_ssid, wifi_ssid)
         if current_ssid == wifi_ssid:
-            continue
-        if current_ssid != saved_ssid:
-            server_ip = ""
+            # Still on the same network
             continue
         print('Network change detected')
+        wifi_ssid = current_ssid
+        if current_ssid != saved_ssid:
+            # Current network is different than home saved network
+            server_ip = ""
+            continue
+        
+        sleep(5)
         discover_online_devices()
+        sleep(1)
+        print(server_ip)
         if server_ip == "":
             continue
         print('Backing up folders...')
         backup_files(path_to_backup_folder)
 
-        sleep(15)
+        
 
 
 def get_ssid(system_type):
@@ -380,7 +392,7 @@ def run_user():
         sleep(1)
         if input(f'Do you want to connect server with ip {server_ip} on wifi with ssid {wifi_ssid}? (y/n): ') == 'y':
             max_time_days = int(input('What is the maximum amount of days should backups be stored on backup server? '))
-            path_to_backup_folder = input('What is the path to backup folder? ')
+            path_to_backup_folder = input('Which folder do you want to backup (path)? ')
             config['USER'] = {'backup_store_time': max_time_days, 'server_ip': server_ip, 'path_to_backup_folder': path_to_backup_folder, 'saved_ssid': wifi_ssid}
             with open('user_config.ini', 'w') as f:
                 config.write(f)
@@ -390,13 +402,14 @@ def run_user():
             return
 
     # Detect network changes
-    network_changes_thread = Thread(target=check_ssid, daemon=True, args=(wifi_ssid, path_to_backup_folder))
+    network_changes_thread = Thread(target=check_ssid, daemon=True, args=(config['USER']['saved_ssid'], config['USER']['path_to_backup_folder']))
+    network_changes_thread.start()
         
     while True:
 
         user_input = input()
         if user_input == "backup":
-            backup_files(path_to_backup_folder)
+            backup_files(config['USER']['path_to_backup_folder'])
         elif user_input == 'show':
             msg= create_msg(6, command = "show")
             send_msg(server_ip, msg)
@@ -404,7 +417,8 @@ def run_user():
         
         elif user_input.split()[0] == "get":
             fileName = user_input.split()[1]
-            msg= create_msg(6, command = fileName)
+            print('Downloading', fileName)
+            msg = create_msg(6, command=fileName)
             send_msg(server_ip, msg)
 
         
