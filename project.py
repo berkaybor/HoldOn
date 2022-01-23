@@ -177,14 +177,14 @@ def send_directory_info():
     send_msg(user_ip,msg)
 
 def udp_listener(local_ip):
-    global user_ip
+    global user_ip, port
 
     receivedFile = {}       ####
     lastPackage = False     ####
     lastPackageSEQ = 0      ####
 
     HOST = ''
-    PORT = 1453
+    PORT = port
     bufferSize = 10240
     IDs = []
     while True:
@@ -225,7 +225,9 @@ def udp_listener(local_ip):
                     lastPackageSEQ = packageSEQ
                 respond_message = {"type": 5, "seq": packageSEQ, "rwnd": 10}
                 respond_message = json.dumps(respond_message)
+                sleep(1)
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
+                    print(user_ip2, PORT)
                     new_socket.connect((user_ip2, PORT))
                     new_socket.sendall(respond_message.encode(encoding=encoding))
                 if lastPackage and (lastPackageSEQ + 1 == len(receivedFile)):
