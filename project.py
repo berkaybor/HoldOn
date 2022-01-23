@@ -13,7 +13,7 @@ import platform
 import os
 import configparser
 from venv import create
-
+from zipfile import ZipFile
 ### Added libraries
 import base64
 
@@ -276,6 +276,45 @@ def send_greeting(target, discover_msg, address_book):
     except:
         return
 
+def get_all_file_paths(directory):
+  
+    # initializing empty file paths list
+    file_paths = []
+  
+    # crawling through directory and subdirectories
+    for root, directories, files in os.walk(directory):
+        for filename in files:
+            # join the two strings in order to form the full filepath.
+            filepath = os.path.join(root, filename)
+            file_paths.append(filepath)
+  
+    # returning all file paths
+    return file_paths
+
+
+def backup_files(backup_dir):
+    zip_name = datetime.now().strftime("%Y-%m-%d_%H:%M:%S") + '.zip'
+    file_paths = get_all_file_paths(backup_dir)
+    
+    # printing the list of all files to be zipped
+    print('Following files will be zipped:')
+    for file_name in file_paths:
+        print(file_name)
+
+    # writing files to a zipfile
+    with ZipFile(zip_name, 'w') as zip:
+        # writing each file one by one
+        for file in file_paths:
+            zip.write(file)
+
+    print('All files zipped successfully!')        
+    
+    sendFile_thread = Thread(target=fileSender, daemon=True, args=(zip_name, server_ip,))
+    sendFile_thread.start()
+    sendFile_thread.join()
+    os.remove(zip_name)
+
+
 def run_user():
     print(local_ip)
     
@@ -307,6 +346,12 @@ def run_user():
             send_msg(server_ip, init_msg)
         else:
             return
+
+    while True:
+        inp = input()
+        if inp == 'backup':
+            backup_files('./backup/')
+            
         
     
 
