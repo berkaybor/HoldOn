@@ -148,14 +148,17 @@ def listen_discover_message():
 
 
 def decodeFile(receivedFile, fileName):
+    global server_ip
+
     endString = ''
     for elm in range(len(receivedFile)):
         endString += str(receivedFile[elm])
-    if server_ip != "":
+    if server_ip == "":
         save_path = './serverBackups'
     else:
         save_path = './downloads'
 
+    fileName = fileName.split("/")[-1]
     completeName = os.path.join(save_path, fileName)
     with open(completeName, "wb") as imageFile:
         endString = endString.encode(encoding)
@@ -179,8 +182,9 @@ def getFileArray(filename):
 
 
 def listen_message():
-    global flyingPackages, receiveWindow, ackPackages, server_ip
+    global flyingPackages, receiveWindow, ackPackages, server_ip, user_ip
 
+    
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", port))
         s.listen()
@@ -208,6 +212,7 @@ def listen_message():
                     with open('server_config.ini', 'w') as f:
                         config.write(f)
                 elif response["type"] == 5:
+                    print(response)
                     currentReceiveWindow = response['rwnd']
                     ackSEQ = response['seq']
                     receiveWindow = currentReceiveWindow
@@ -216,15 +221,18 @@ def listen_message():
                     if response['command'] == "show":
                         send_directory_info()
                     else:
-                        sendFile(response['command'])
+                        print(f"Sending {response['command']}")
+                        print(user_ip)
+                        sendFile_thread = Thread(target=sendFile, daemon=True, args=(response['command'], user_ip,))
+                        sendFile_thread.start()
                 elif response['type'] == 7:
                     print("type 7 works")
                     print(response['input'])
 
 
-def sendFile(fileName):
-    save_path = './serverBackups'
-    completeName = os.path.join(save_path, fileName)
+def sendFile(fileName, user_ip):
+    file_path = './serverBackups'
+    completeName = os.path.join(file_path, fileName)
     fileSender(completeName, user_ip)
 
 
