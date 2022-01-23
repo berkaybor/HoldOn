@@ -351,7 +351,7 @@ def check_ssid(saved_ssid, path_to_backup_folder):
             server_ip = ""
             continue
         
-        sleep(5)
+        sleep(10)
         discover_online_devices()
         sleep(1)
         print(server_ip)
@@ -411,7 +411,7 @@ def run_user():
         if user_input == "backup":
             backup_files(config['USER']['path_to_backup_folder'])
         elif user_input == 'show':
-            msg= create_msg(6, command = "show")
+            msg = create_msg(6, command = "show")
             send_msg(server_ip, msg)
 
         
