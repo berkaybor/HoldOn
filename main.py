@@ -109,7 +109,6 @@ def listen_discover_message():
             message = json.loads(json_msg.decode(encoding=encoding))
             if message["type"] == 1:
                 if message["IP"] != ip_address:
-                    print(message)
 
                     if message['ID'] in IDs:
                         continue
@@ -186,18 +185,19 @@ def listen_message():
                     print("There is a problem about your socket you should restart your cmd or computer")
                     break
                 response = json.loads(output.decode(encoding=encoding))
+                print(response)
                 if response["type"] == 1:
                     print('MESSAGE TYPE 1 NOT USED IN TCP')
                     continue
                 elif response["type"] == 2:
-                    server_ip = output['IP']
+                    server_ip = response['IP']
                     print(f'Connected to server with ip: {server_ip}')
                 elif response["type"] == 3:
                     print('Initializing server...')
                     config = configparser.ConfigParser()
                     if os.path.exists('server_config.ini'):
                         config.read('server_config.ini')
-                    config['SERVER'] = {'backup_store_time': output['backup_store_time']}
+                    config['SERVER'] = {'backup_store_time': response['backup_store_time']}
                     with open('server_config.ini', 'w') as f:
                         config.write(f)
                 elif response["type"] == 5:
@@ -221,7 +221,7 @@ def listen_message():
 
 def send_directory_info():
     filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
-    msg = create_msg(7,body=filenames)
+    msg = create_msg(7,command=filenames)
     send_msg(user_ip,msg)
 
 
