@@ -69,9 +69,8 @@ def getFileArray(filename):
     return fileArray
 
 def fileSender(fileName, receiver):
-    global flyingPackages
-    global receiveWindow
-    global ackPackages
+    global flyingPackages, receiveWindow, ackPackages
+
     packageCounter = 0
     fileArray = getFileArray(fileName)
     dt = datetime.now()
@@ -110,10 +109,8 @@ def sendPackage(package, SEQ, fileName, receiver):
     fileName = fileName.decode(encoding)
     message = {"type": 4, "name": fileName, "seq": SEQ, "body": package, "IP": local_ip}
     jsonMessage = json.dumps(message)
-    opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    opened_socket.sendto(jsonMessage.encode(encoding=encoding), (receiver, port))
-
-
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.sendto(jsonMessage.encode(encoding=encoding), (receiver, port))
 
 
 def get_ip():
@@ -128,7 +125,7 @@ def get_ip():
     return IP
 
 def tcp_listener(local_ip):
-    global server_ip
+    global server_ip, flyingPackages, receiveWindow, ackPackages
 
     HOST = ''
     PORT = 1453
@@ -177,6 +174,7 @@ def send_directory_info():
     send_msg(user_ip,msg)
 
 def udp_listener(local_ip):
+    global user_ip
 
     receivedFile = {}       ####
     lastPackage = False     ####
@@ -188,6 +186,7 @@ def udp_listener(local_ip):
     IDs = []
     while True:
         incoming = {}
+        user_ip2 = user_ip
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.bind((HOST, PORT))
             s.setblocking(0)
@@ -203,6 +202,7 @@ def udp_listener(local_ip):
                 IDs.append(incoming['ID'])
 
                 user_ip = incoming['IP']
+                user_ip2 = user_ip
                 print(user_ip)
                 discover_response = create_msg(2, local_ip)
                 send_msg(user_ip, discover_response)
@@ -223,7 +223,7 @@ def udp_listener(local_ip):
                 respond_message = {"type": 5, "seq": packageSEQ, "rwnd": 10}
                 respond_message = json.dumps(respond_message)
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
-                    new_socket.connect((incoming["IP"], port))
+                    new_socket.connect((user_ip2, PORT))
                     new_socket.sendall(respond_message.encode(encoding=encoding))
                 if lastPackage and (lastPackageSEQ + 1 == len(receivedFile)):
                     decodeFile(receivedFile, fileName)
