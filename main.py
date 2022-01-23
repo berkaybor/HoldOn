@@ -58,21 +58,21 @@ def create_msg(msg_type, ip=None, backup_store_time=None, command=None):
         # Discover message
         curr_dt = datetime.now()
         timestamp = int(round(curr_dt.timestamp()))
-        return {'type': msg_type, 'IP': ip, 'ID': timestamp}
+        return json.dumps({'type': msg_type, 'IP': ip, 'ID': timestamp})
     elif msg_type == 2:
         # Discover response
-        return {'type': msg_type, 'IP': ip}
+        return json.dumps({'type': msg_type, 'IP': ip})
     elif msg_type == 3:
         # Initialize app
-        return {'type': msg_type, 'backup_store_time': backup_store_time}
+        return json.dumps({'type': msg_type, 'backup_store_time': backup_store_time})
     elif msg_type == 4:
         pass
     elif msg_type == 5:
         pass
     elif msg_type == 6:
-        return {'type': msg_type, 'command': command}
+        return json.dumps({'type': msg_type, 'command': command})
     elif msg_type == 7:
-        return {'type': msg_type, 'input': command}
+        return json.dumps({'type': msg_type, 'input': command})
     else:
         raise Exception('Wrong type of msg')
 
@@ -86,7 +86,7 @@ def discover_online_devices():
 
 
 def send_msg(host, msg):
-    byte_msg = json.dumps(msg).encode('utf-8')
+    byte_msg = msg.encode('utf-8')
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
         s.sendall(byte_msg)
