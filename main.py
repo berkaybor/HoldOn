@@ -157,8 +157,10 @@ def decodeFile(receivedFile, fileName):
         save_path = './serverBackups'
     else:
         save_path = './downloads'
+        if not os.path.exists('./downloads'):
+            os.makedirs('downloads')
+        fileName = fileName.split("/")[-1]
 
-    fileName = fileName.split("/")[-1]
     completeName = os.path.join(save_path, fileName)
     with open(completeName, "wb") as imageFile:
         endString = endString.encode(encoding)
@@ -329,6 +331,26 @@ def backup_files(backup_dir):
 
     os.remove(zip_name)
 
+def check_ssid(saved_ssid, path_to_backup_folder):
+    global wifi_ssid, server_ip
+
+    while True:
+        current_ssid = get_ssid()
+        if current_ssid == wifi_ssid:
+            continue
+        if current_ssid != saved_ssid:
+            server_ip = ""
+            continue
+        print('Network change detected')
+        discover_online_devices()
+        if server_ip == "":
+            continue
+        print('Backing up folders...')
+        backup_files(path_to_backup_folder)
+
+        sleep(15)
+
+
 def get_ssid(system_type):
     if system_type == 'Darwin':
         ssid_line = r"/Sy*/L*/Priv*/Apple8*/V*/C*/R*/airport -I | awk '/ SSID:/ {print $2}'"
@@ -358,19 +380,23 @@ def run_user():
         sleep(1)
         if input(f'Do you want to connect server with ip {server_ip} on wifi with ssid {wifi_ssid}? (y/n): ') == 'y':
             max_time_days = int(input('What is the maximum amount of days should backups be stored on backup server? '))
-            config['USER'] = {'backup_store_time': max_time_days, 'server_ip': server_ip}
+            path_to_backup_folder = input('What is the path to backup folder? ')
+            config['USER'] = {'backup_store_time': max_time_days, 'server_ip': server_ip, 'path_to_backup_folder': path_to_backup_folder, 'saved_ssid': wifi_ssid}
             with open('user_config.ini', 'w') as f:
                 config.write(f)
             init_msg = create_msg(3, backup_store_time=max_time_days)
             send_msg(server_ip, init_msg)
         else:
             return
+
+    # Detect network changes
+    network_changes_thread = Thread(target=check_ssid, daemon=True, args=(wifi_ssid, path_to_backup_folder))
         
     while True:
 
         user_input = input()
         if user_input == "backup":
-            backup_files('./backup/')
+            backup_files(path_to_backup_folder)
         elif user_input == 'show':
             msg= create_msg(6, command = "show")
             send_msg(server_ip, msg)
