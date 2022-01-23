@@ -105,7 +105,7 @@ def sendPackage(package, SEQ, fileName, receiver):
     fileName = fileName.encode(encoding)
     fileName = base64.b64encode(fileName)
     fileName = fileName.decode(encoding)
-    message = {"type": 4, "name": fileName, "seq": SEQ, "body": package, "IP": ip_address}
+    message = {"type": 4, "name": fileName, "seq": SEQ, "body": package, "IP": local_ip}
     jsonMessage = json.dumps(message)
     opened_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     opened_socket.sendto(jsonMessage.encode(encoding=encoding), (receiver, port))
@@ -154,13 +154,22 @@ def tcp_listener(local_ip):
                 config['SERVER'] = {'backup_store_time': incoming['backup_store_time']}
                 with open('server_config.ini', 'w') as f:
                     config.write(f)
+            elif incoming['type'] == 5:
+                currentReceiveWindow = incoming['rwnd']
+                ackSEQ = incoming['seq']
+                receiveWindow = currentReceiveWindow
 
+                ackPackages.append(ackSEQ)
 
 
         except:
             continue
 
 def udp_listener(local_ip):
+
+    receivedFile = {}       ####
+    lastPackage = False     ####
+    lastPackageSEQ = 0      ####
 
     HOST = ''
     PORT = 1453
@@ -174,18 +183,43 @@ def udp_listener(local_ip):
             result = select.select([s], [], [])
             data = result[0][0].recv(bufferSize)
             incoming = json.loads(data.decode('utf-8'))
-            print(incoming)
 
-            if incoming['ID'] in IDs:
-                continue
-            IDs.append(incoming['ID'])
+            if incoming["type"] == 1:  ####
+                print(incoming)
 
-            user_ip = incoming['IP']
-            print(user_ip)
-            discover_response = create_msg(2, local_ip)
-            send_msg(user_ip, discover_response)
-            
-            print(f'Connected to user with ip: {user_ip}')
+                if incoming['ID'] in IDs:
+                    continue
+                IDs.append(incoming['ID'])
+
+                user_ip = incoming['IP']
+                print(user_ip)
+                discover_response = create_msg(2, local_ip)
+                send_msg(user_ip, discover_response)
+                
+                print(f'Connected to user with ip: {user_ip}')
+
+            elif incoming["type"] == 4:  ####
+                fileName = incoming["name"]
+                fileName = fileName.encode(encoding)
+                fileName = base64.b64decode(fileName)
+                fileName = fileName.decode(encoding)
+                packageSEQ = incoming["seq"]
+                packageBody = incoming["body"]
+                receivedFile[packageSEQ] = packageBody
+                if packageBody == '':
+                    lastPackage = True
+                    lastPackageSEQ = packageSEQ
+                respond_message = {"type": 5, "seq": packageSEQ, "rwnd": 10}
+                respond_message = json.dumps(respond_message)
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as new_socket:
+                    new_socket.connect((incoming["IP"], port))
+                    new_socket.sendall(respond_message.encode(encoding=encoding))
+                if lastPackage and (lastPackageSEQ + 1 == len(receivedFile)):
+                    decodeFile(receivedFile, fileName)
+                    print(f'{fileName} packageNo {packageSEQ} is received')
+                    receivedFile.clear()
+                    lastPackage = False
+                    lastPackageSEQ = 0
 
 def create_msg(msg_type, ip=None, ID=None, backup_store_time=None):
     if msg_type == 1:
@@ -408,3 +442,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    ### to send file:
+    ### sendFile_thread = Thread(target=fileSender, daemon=True, args=(filename, receiver_ip,))
+    ### sendFile_thread.start()
