@@ -151,7 +151,10 @@ def decodeFile(receivedFile, fileName):
     endString = ''
     for elm in range(len(receivedFile)):
         endString += str(receivedFile[elm])
-    save_path = './serverBackups'
+    if server_ip != "":
+        save_path = './serverBackups'
+    else:
+        save_path = './downloads'
 
     completeName = os.path.join(save_path, fileName)
     with open(completeName, "wb") as imageFile:
@@ -212,15 +215,17 @@ def listen_message():
                 elif response['type'] == 6:
                     if response['command'] == "show":
                         send_directory_info()
-                    #else:
-                    #    sendFile(response['command'])
+                    else:
+                        sendFile(response['command'])
                 elif response['type'] == 7:
                     print("type 7 works")
                     print(response['input'])
 
 
-#def sendFile(fileName):
-
+def sendFile(fileName):
+    save_path = './serverBackups'
+    completeName = os.path.join(save_path, fileName)
+    fileSender(completeName, user_ip)
 
 
 def send_directory_info():
@@ -363,7 +368,7 @@ def run_user():
             send_msg(server_ip, msg)
 
         
-        elif user_input.split()[0] == "give":
+        elif user_input.split()[0] == "get":
             fileName = user_input.split()[1]
             msg= create_msg(6, command = fileName)
             send_msg(server_ip, msg)
