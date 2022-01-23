@@ -44,6 +44,10 @@ def create_message(message_type, body=""):
         message = {"IP": ip_address, "type": message_type}
     elif message_type == 3:
         message = {"type": message_type, "body": body}
+    elif message_type == 6:
+        message = {'type': message_type, 'command': body}
+    elif message_type == 7:
+        message = {'type': message_type, 'input': body}
     return json.dumps(message)
 
 
@@ -179,8 +183,20 @@ def listen_message():
                     currentReceiveWindow = response['rwnd']
                     ackSEQ = response['seq']
                     receiveWindow = currentReceiveWindow
-
                     ackPackages.append(ackSEQ)
+                elif response['type'] == 6:
+                    if response['command'] == "show":
+                        send_directory_info()
+                    else:
+                        sendFile() ##TODO
+                elif response['type'] == 7:
+                    print("type 7 works")
+                    print(response['input'])
+
+def send_directory_info():
+    filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
+    msg = create_message(7,body=filenames)
+    send_msg(user_ip,msg)
 
 
 def application_user_interface():
