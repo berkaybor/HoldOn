@@ -243,7 +243,6 @@ def create_msg(msg_type, ip=None, ID=None, backup_store_time=None):
     else:
         raise Exception('Wrong type of msg')
 
-
 def send_msg(host, msg):
 
     HOST = host
@@ -253,7 +252,6 @@ def send_msg(host, msg):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         s.sendall(byte_msg)
-
 
 def bcast_discovery(msg):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -374,6 +372,18 @@ def run_server():
     threads.append(udp_listener_t)
     #udp_listener_t.join()
 
+def get_ssid(system_type):
+    if system_type == 'Darwin':
+        ssid_line = r"/Sy*/L*/Priv*/Apple8*/V*/C*/R*/airport -I | awk '/ SSID:/ {print $2}'"
+    elif system_type == 'Linux':
+        ssid_line = 'iwgetid -r'
+    elif system_type == 'Windows':
+        # TODO: Add windows command
+        raise NotImplementedError('Windows not supported')
+    else:
+        raise NotImplementedError('Platform not supported')
+
+    return subprocess.run(ssid_line, shell=True, capture_output=True, text=True).stdout.strip()
 
 def main():
 
@@ -383,15 +393,7 @@ def main():
     print('Local ip: ' + local_ip)
 
     system_type = platform.system()
-    if system_type == 'Darwin':
-        wifi_ssid = subprocess.run(r"/Sy*/L*/Priv*/Apple8*/V*/C*/R*/airport -I | awk '/ SSID:/ {print $2}'", shell=True, capture_output=True, text=True).stdout.strip()
-    elif system_type == 'Linux':
-        wifi_ssid = subprocess.run('iwgetid -r', shell=True, capture_output=True, text=True).stdout.strip()
-    elif system_type == 'Windows':
-        # TODO: Add windows command
-        pass
-    else:
-        raise NotImplementedError('Platform not supported')
+    wifi_ssid = get_ssid(system_type)
 
     print('wifi ssid:', wifi_ssid)
 
