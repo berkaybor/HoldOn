@@ -161,12 +161,20 @@ def tcp_listener(local_ip):
                 currentReceiveWindow = incoming['rwnd']
                 ackSEQ = incoming['seq']
                 receiveWindow = currentReceiveWindow
-
                 ackPackages.append(ackSEQ)
+            elif incoming['type'] == 6:
+                send_directory_info()
+            elif incoming['type'] == 7:
+                print(incoming['input'])
 
 
         except:
             continue
+
+def send_directory_info():
+    filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
+    msg = create_msg(7,command=filenames)
+    send_msg(user_ip,msg)
 
 def udp_listener(local_ip):
 
@@ -224,7 +232,7 @@ def udp_listener(local_ip):
                     lastPackage = False
                     lastPackageSEQ = 0
 
-def create_msg(msg_type, ip=None, ID=None, backup_store_time=None):
+def create_msg(msg_type, ip=None, ID=None, backup_store_time=None, command=None):
     if msg_type == 1:
         # Discover message
         return {'type': msg_type, 'IP': ip, 'ID': ID}
@@ -239,7 +247,9 @@ def create_msg(msg_type, ip=None, ID=None, backup_store_time=None):
     elif msg_type == 5:
         pass
     elif msg_type == 6:
-        pass
+        return {'type': msg_type, 'command': command}
+    elif msg_type == 7:
+        return {'type': msg_type, 'input': command}
     else:
         raise Exception('Wrong type of msg')
 
@@ -352,6 +362,10 @@ def run_user():
         inp = input()
         if inp == 'backup':
             backup_files('./backup/')
+        elif inp == 'show':
+            msg= create_msg(6, command = "show")
+            send_msg(server_ip, msg)
+
             
         
     
