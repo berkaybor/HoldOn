@@ -208,15 +208,20 @@ def listen_message():
                 elif response['type'] == 6:
                     if response['command'] == "show":
                         send_directory_info()
-                    else:
-                        sendFile() ##TODO
+                    #else:
+                    #    sendFile(response['command'])
                 elif response['type'] == 7:
                     print("type 7 works")
                     print(response['input'])
 
+
+#def sendFile(fileName):
+
+
+
 def send_directory_info():
     filenames = next(os.walk("./serverBackups"), (None, None, []))[2]
-    msg = create_message(7,body=filenames)
+    msg = create_msg(7,body=filenames)
     send_msg(user_ip,msg)
 
 
@@ -349,6 +354,14 @@ def run_user():
         elif user_input == 'show':
             msg= create_msg(6, command = "show")
             send_msg(server_ip, msg)
+
+        
+        elif user_input.split()[0] == "give":
+            fileName = user_input.split()[1]
+            msg= create_msg(6, command = fileName)
+            send_msg(server_ip, msg)
+
+        
         else:
             print("No Valid Command")
 
