@@ -155,13 +155,16 @@ def tcp_listener(local_ip):
                 with open('server_config.ini', 'w') as f:
                     config.write(f)
             elif incoming['type'] == 5:
+                print("type 5 working")
                 currentReceiveWindow = incoming['rwnd']
                 ackSEQ = incoming['seq']
                 receiveWindow = currentReceiveWindow
                 ackPackages.append(ackSEQ)
             elif incoming['type'] == 6:
+                print("type 6 works")
                 send_directory_info()
             elif incoming['type'] == 7:
+                print("type 7 works")
                 print(incoming['input'])
 
 
