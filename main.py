@@ -81,8 +81,10 @@ def discover_online_devices():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(("", 0))
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        msg = create_msg(1, ip=ip_address)
+        print(msg)
         for i in range(10):
-            sock.sendto(create_msg(1, ip=ip_address).encode(encoding=encoding), ('<broadcast>', port))
+            sock.sendto(msg.encode(encoding=encoding), ('<broadcast>', port))
 
 
 def send_msg(host, msg):
@@ -149,8 +151,10 @@ def decodeFile(receivedFile, fileName):
     endString = ''
     for elm in range(len(receivedFile)):
         endString += str(receivedFile[elm])
+    save_path = './serverBackups'
 
-    with open(fileName, "wb") as imageFile:
+    completeName = os.path.join(save_path, fileName)
+    with open(completeName, "wb") as imageFile:
         endString = endString.encode(encoding)
         decodedString = base64.decodebytes(endString)
         imageFile.write(decodedString)
